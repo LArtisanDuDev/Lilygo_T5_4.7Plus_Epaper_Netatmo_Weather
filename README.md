@@ -4,7 +4,7 @@ Ce dépot contient le code permettant d'afficher les informations de sa station 
 
 ![H578](./doc/H578_SMALL.jpg)
 
-Pour pouvoire utiliser les informations de votre station météo, vous devez créer un compte [ici](https://dev.netatmo.com/apps/). Ensuite vous devez paramétrer le fichier [TOCUSTOMIZE.h](./include/TOCUSTOMIZE.h) avec vos informations (Netatmo + Wifi). Dans ce fichier vous pouvez aussi paramétrer l'interval de réveil de la carte et votre écart local par rapport à l'heure UTC (Netatmo enregistre l'heure de mise à jour des capteurs en heure UTC)
+Pour pouvoir utiliser les informations de votre station météo, vous devez créer un compte [ici](https://dev.netatmo.com/apps/). Ensuite vous devez paramétrer le fichier [TOCUSTOMIZE.h](./include/TOCUSTOMIZE.h) avec vos informations (Netatmo + Wifi). Dans ce fichier vous pouvez aussi paramétrer l'interval de réveil de la carte et votre écart local par rapport à l'heure UTC (Netatmo enregistre l'heure de mise à jour des capteurs en heure UTC)
 
 ## Probable Bug
 
