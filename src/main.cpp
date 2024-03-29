@@ -333,17 +333,17 @@ void displayModulePluvio(module_struct module, int y)
   const int nameOffsetX = 10;
   const int nameOffsetY = 40;
 
-  const int mmOffsetX = 320;
+  const int mmOffsetX = 20;
   const int mmOffsetY = 100;
 
-  const int mmSum24HOffsetX = 20;
+  const int mmSum24HOffsetX = 240;
   const int mmSum24HOffsetY = 100;
 
   drawRect(4, y, rectWidth, rectHeight);
   drawString(nameOffsetX, y + nameOffsetY, module.name, &OpenSans24);  
 
-  drawString(mmOffsetX, y + mmOffsetY, module.rain + "mm", &FiraSans_40);  
-  drawString(mmSum24HOffsetX, y + mmSum24HOffsetY, "24H : " + module.sum_rain_24h + "mm", &OpenSans16);  
+  drawString(mmSum24HOffsetX, y + mmSum24HOffsetY, module.sum_rain_24h + "mm", &FiraSans_40);  
+  drawString(mmOffsetX, y + mmOffsetY, "1H : " + module.rain + "mm", &OpenSans16);  
     
 }
 
@@ -364,10 +364,10 @@ void displayModule(module_struct module, int y)
   const int humidityOffsetY = 140;
   
   const int minTempOffsetX = 15;
-  const int minTempOffsetY = 100;
+  const int minTempOffsetY = 140;
 
   const int maxTempOffsetX = 15;
-  const int maxTempOffsetY = 140;
+  const int maxTempOffsetY = 100;
 
   const int trendTempOffsetX = 270;
   const int trendTempOffsetY = 90;
