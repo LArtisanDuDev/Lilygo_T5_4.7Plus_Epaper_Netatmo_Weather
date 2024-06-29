@@ -6,6 +6,9 @@ Ce dépot contient le code permettant d'afficher les informations de sa station 
 
 Pour pouvoir utiliser les informations de votre station météo, vous devez créer un compte [ici](https://dev.netatmo.com/apps/). Ensuite vous devez paramétrer le fichier [TOCUSTOMIZE.h](./include/TOCUSTOMIZE.h) avec vos informations (Netatmo + Wifi). Dans ce fichier vous pouvez aussi paramétrer l'interval de réveil de la carte et votre écart local par rapport à l'heure UTC (Netatmo enregistre l'heure de mise à jour des capteurs en heure UTC)
 
+Lors du premier lancement, il faut décommenter la ligne #define FORCE_NVS, builder, uploader sur votre board, la démarrer.
+Puis lorsque l'affichage est ok, recommenter la ligne, builder, uploader sur votre board.
+
 ## Probable Bug
 
 Mon équipement Netatmo est constitué de trois capteurs de température. Il est possible que cela plante s'il y a moins de capteurs.
