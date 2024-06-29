@@ -68,7 +68,6 @@ void displayModulePluvio(module_struct module, int y);
 void displayModule(module_struct module, int y);
 void displayInfo(NetatmoWeatherAPI myAPI);
 void goToDeepSleepUntilNextWakeup();
-void sendDataToDebugServer(String str_message);
 void drawDebugGrid();
 
 void drawString(int x, int y, String text, const EpdFont *font)
@@ -149,7 +148,7 @@ void setup()
 
     nvs.begin("netatmoCred", false);
     NetatmoWeatherAPI myAPI;
-    sendDataToDebugServer("setup Init");
+    
 
 #ifdef FORCE_NVS
     nvs.putString("access_token", access_token);
@@ -171,54 +170,32 @@ void setup()
     memcpy(previous_access_token, access_token, 58);
     memcpy(previous_refresh_token, refresh_token, 58); 
 
-    sendDataToDebugServer("setup NVS Access=" + String(access_token));   
-    sendDataToDebugServer("setup NVS Refresh=" + String(refresh_token));   
-
+    
     #ifdef DEBUG_NETATMO
       myAPI.setDebug(true);
     #endif
 
     int result = myAPI.getStationsData(access_token, device_id, DELAYUTC_YOURTIMEZONE);
-    if (result == EXPIRED_ACCESS_TOKEN) {
-      sendDataToDebugServer("setup Expired Access Token");
-    } 
-    if (result == INVALID_ACCESS_TOKEN) {
-      sendDataToDebugServer("setup Invalid Access Token");
-    }   
-
-    if (result == VALID_ACCESS_TOKEN) {
-      sendDataToDebugServer("setup Valid Access Token");
-    }
 
     if (result == EXPIRED_ACCESS_TOKEN || result == INVALID_ACCESS_TOKEN) {
       if (myAPI.getRefreshToken(access_token, refresh_token, client_secret, client_id))
       {
-        sendDataToDebugServer("setup getRefreshToken Access=" + String(access_token));   
-        sendDataToDebugServer("setup getRefreshToken Refresh=" + String(refresh_token));   
-
         // compare cred with previous
         if(strncmp(previous_access_token, access_token, 58) != 0){
           nvs.putString("access_token", access_token);
           Serial.println("NVS : access_token updated");
-          sendDataToDebugServer("setup getRefreshToken Access Token Updated");   
         } else {
           Serial.println("NVS : same access_token");
-          sendDataToDebugServer("setup getRefreshToken Same Access Token"); 
         }
 
         if(strncmp(previous_refresh_token, refresh_token, 58) != 0){
           nvs.putString("refresh_token", refresh_token);
           Serial.println("NVS : refresh_token updated");
-          sendDataToDebugServer("setup getRefreshToken Refresh Token Updated");   
         } else {
           Serial.println("NVS : same refresh_token");
-          sendDataToDebugServer("setup getRefreshToken Same Refresh Token"); 
         }
 
         result = myAPI.getStationsData(access_token, device_id, DELAYUTC_YOURTIMEZONE);
-        sendDataToDebugServer("setup getStationsData result=" + result); 
-      } else {
-        sendDataToDebugServer("setup getRefreshToken False");   
       }
     }
 
@@ -226,13 +203,11 @@ void setup()
     if (result == VALID_ACCESS_TOKEN)
     {
         Serial.println("Start display");
-        sendDataToDebugServer("setup Start Display"); 
         clearScreen();
         #ifdef DEBUG_GRID
         drawDebugGrid();
         #endif
         displayInfo(myAPI);
-        sendDataToDebugServer("setup End displayInfo"); 
         
       }
       else
@@ -243,12 +218,10 @@ void setup()
     }
   }
 
-  sendDataToDebugServer("setup End Display"); 
         
   err = epd_hl_update_screen(&hl, MODE_GC16, temperature);
   Serial.print("Update Result : ");
   Serial.println(err);
-  sendDataToDebugServer("setup End"); 
   
   goToDeepSleepUntilNextWakeup();
 }
@@ -469,21 +442,4 @@ void goToDeepSleepUntilNextWakeup()
 void loop()
 {
   // put your main code here, to run repeatedly:
-}
-
-void sendDataToDebugServer(String str_message)
-{
-
-  if (WiFi.status() == WL_CONNECTED)
-  {
-    HTTPClient http;
-    String debugServerPayLoad = str_message;
-    
-    Serial.println(debugServerPayLoad);
-
-    http.begin("http://192.168.0.216/esp32/message=" + str_message);
-    http.addHeader("Content-Type", "application/x-www-form-urlencoded");
-    int httpCode = http.GET();
-    http.end();
-  }
 }
