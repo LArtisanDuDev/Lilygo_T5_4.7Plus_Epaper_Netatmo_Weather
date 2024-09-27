@@ -55,7 +55,16 @@ int currentLinePos = 35;
 int batteryPercentage = 0;
 float batteryVoltage = 0.0;
 
+const char *ntpServer = "pool.ntp.org";
+
+
 // put function declarations here:
+String getDayOfWeekInFrench(int dayOfWeek);
+String getMonthInFrench(int month);
+tm getTimeWithDelta(int delta);
+String getFullDateStringAddDelta(bool withTime, int delta);
+bool initializeTime();
+
 void drawString(int x, int y, String text, const EpdFont *font);
 void drawLine(int x0, int y0, int y1, int y2);
 void drawRect(int x, int y, int width, int height);
@@ -69,6 +78,99 @@ void displayModule(module_struct module, int y);
 void displayInfo(NetatmoWeatherAPI myAPI);
 void goToDeepSleepUntilNextWakeup();
 void drawDebugGrid();
+
+// Helper functions to get French abbreviations
+String getDayOfWeekInFrench(int dayOfWeek)
+{
+  const char *daysFrench[] = {"Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"};
+  return daysFrench[dayOfWeek % 7]; // Use modulo just in case
+}
+
+String getMonthInFrench(int month)
+{
+  const char *monthsFrench[] = {"Jan", "Fev", "Mar", "Avr", "Mai", "Juin", "Juil", "Aou", "Sep", "Oct", "Nov", "Dec"};
+  return monthsFrench[(month - 1) % 12]; // Use modulo and adjust since tm_mon is [0,11]
+}
+
+tm getTimeWithDelta(int delta)
+{
+  struct tm timeinfo;
+  if (!getLocalTime(&timeinfo))
+  {
+    Serial.println("Echec de récupération de la date !");
+    timeinfo = {0};
+  }
+
+  timeinfo.tm_mday += delta;
+  mktime(&timeinfo);
+  return timeinfo;
+}
+
+String getFullDateStringAddDelta(bool withTime, int delta)
+{
+  struct tm timeinfo = getTimeWithDelta(delta);
+  String dayOfWeek = getDayOfWeekInFrench(timeinfo.tm_wday);
+  String month = getMonthInFrench(timeinfo.tm_mon + 1); // tm_mon is months since January - [0,11]
+  char dayBuffer[3];
+  snprintf(dayBuffer, sizeof(dayBuffer), "%02d", timeinfo.tm_mday);
+
+  String result = dayOfWeek + " " + String(dayBuffer) + " " + month;
+  if (withTime)
+  {
+    char timeBuffer[9];
+    snprintf(timeBuffer, sizeof(timeBuffer), "%02d:%02d:%02d", timeinfo.tm_hour, timeinfo.tm_min, timeinfo.tm_sec);
+    result = result + " " + String(timeBuffer);
+  }
+  return result;
+}
+
+bool initializeTime()
+{
+  // If connected to WiFi, attempt to synchronize time with NTP
+  if (WiFi.status() == WL_CONNECTED)
+  {
+    Serial.println("Tentative de synchronisation NTP...");
+    configTzTime("CET-1CEST,M3.5.0,M10.5.0/3", ntpServer); // Configure time zone to adjust for daylight savings
+
+    const int maxNTPAttempts = 5;
+    int ntpAttempts = 0;
+    time_t now;
+    struct tm timeinfo;
+    while (ntpAttempts < maxNTPAttempts)
+    {
+      time(&now);
+      localtime_r(&now, &timeinfo);
+
+      if (timeinfo.tm_year > (2016 - 1900))
+      { // Check if the year is plausible
+        Serial.println("NTP time synchronized!");
+        return true;
+      }
+
+      ntpAttempts++;
+      Serial.println("Attente de la synchronisation NTP...");
+      delay(2000); // Delay between attempts to prevent overloading the server
+    }
+
+    Serial.println("Échec de synchronisation NTP, utilisation de l'heure RTC.");
+  }
+
+  // Regardless of WiFi or NTP sync, try to use RTC time
+  struct tm timeinfo;
+  if (!getLocalTime(&timeinfo, 0))
+  { // Immediately return the RTC time without waiting
+    if (timeinfo.tm_year < (2016 - 1900))
+    { // If year is not plausible, RTC time is not set
+      Serial.println("Échec de récupération de l'heure RTC, veuillez vérifier si l'heure a été définie.");
+      return false;
+    }
+  }
+
+  Serial.println("Heure RTC utilisée.");
+  return true;
+}
+
+
 
 void drawString(int x, int y, String text, const EpdFont *font)
 {
@@ -143,6 +245,8 @@ void setup()
   }
   else
   {
+    initializeTime();
+
     char previous_access_token[58];
     char previous_refresh_token[58];
 
@@ -394,6 +498,10 @@ void displayInfo(NetatmoWeatherAPI myAPI)
 
   displayModulePluvio(myAPI.NAModule3, y);
   drawBatteryLevel(battery_left_margin, y + battery_top_margin, myAPI.NAModule3.battery_percent);
+
+  String dateRefresh = getFullDateStringAddDelta(true,0);
+  drawString(15, y + 140, "↻ " + dateRefresh, &OpenSans16);
+
 }
 
 
