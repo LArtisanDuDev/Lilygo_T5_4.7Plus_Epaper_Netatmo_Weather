@@ -29,6 +29,9 @@
 #include <Preferences.h>
 
 Preferences nvs;
+char previous_access_token[58];
+char previous_refresh_token[58];
+
 EpdiyHighlevelState hl;
 // ambient temperature around device
 int temperature = 20;
@@ -76,6 +79,8 @@ void drawBatteryLevel(int batteryTopLeftX, int batteryTopLeftY, int percentage);
 void displayModulePluvio(module_struct module, int y);
 void displayModule(module_struct module, int y);
 void displayInfo(NetatmoWeatherAPI myAPI);
+int getDataFromAPI(NetatmoWeatherAPI *myAPI);
+
 void goToDeepSleepUntilNextWakeup();
 void drawDebugGrid();
 
@@ -246,10 +251,7 @@ void setup()
   else
   {
     initializeTime();
-
-    char previous_access_token[58];
-    char previous_refresh_token[58];
-
+	  
     nvs.begin("netatmoCred", false);
     NetatmoWeatherAPI myAPI;
     
@@ -278,55 +280,43 @@ void setup()
     #ifdef DEBUG_NETATMO
       myAPI.setDebug(true);
     #endif
+    int res = getDataFromAPI(&myAPI); 
+    clearScreen();
 
-    int result = myAPI.getStationsData(access_token, device_id, DELAYUTC_YOURTIMEZONE);
-
-    if (result == EXPIRED_ACCESS_TOKEN || result == INVALID_ACCESS_TOKEN) {
-      if (myAPI.getRefreshToken(access_token, refresh_token, client_secret, client_id))
-      {
-        // compare cred with previous
-        if(strncmp(previous_access_token, access_token, 58) != 0){
-          nvs.putString("access_token", access_token);
-          Serial.println("NVS : access_token updated");
-        } else {
-          Serial.println("NVS : same access_token");
-        }
-
-        if(strncmp(previous_refresh_token, refresh_token, 58) != 0){
-          nvs.putString("refresh_token", refresh_token);
-          Serial.println("NVS : refresh_token updated");
-        } else {
-          Serial.println("NVS : same refresh_token");
-        }
-
-        result = myAPI.getStationsData(access_token, device_id, DELAYUTC_YOURTIMEZONE);
-      }
-    }
-
-    // Gathering Netatmo datas
-    if (result == VALID_ACCESS_TOKEN)
+    if (res == VALID_ACCESS_TOKEN)
     {
-        Serial.println("Start display");
-        clearScreen();
-        #ifdef DEBUG_GRID
-        drawDebugGrid();
-        #endif
-        displayInfo(myAPI);
-        
-      }
-      else
-      {
-        clearScreen();
-        displayLine("GetStationsData Error");
-      
-    }
+      Serial.println("Start display");
+#ifdef DEBUG_GRID
+      drawDebugGrid();
+#endif
+      displayInfo(myAPI);
+    } else {
+      displayLine("API Error");
+      switch (res)
+        {
+          case 3:
+            displayLine("Expired Token");
+          break;
+          case 2:
+            displayLine("Invalid Token");
+          break;
+          case 1:
+            displayLine("Other");
+          break;
+          case 0:
+            displayLine("Ok ? WTF ?");
+          break;
+        }
+        displayLine("Msg " + myAPI.errorMessage);
+        displayLine("LastBody " + myAPI.lastBody);
+    }    
   }
 
-        
+
   err = epd_hl_update_screen(&hl, MODE_GC16, temperature);
   Serial.print("Update Result : ");
   Serial.println(err);
-  
+
   goToDeepSleepUntilNextWakeup();
 }
 
@@ -350,9 +340,46 @@ void updateBatteryPercentage(int &percentage, float &voltage)
   }
 }
 
+
+int getDataFromAPI(NetatmoWeatherAPI *myAPI) {
+  #ifdef DEBUG_NETATMO
+      myAPI->setDebug(true);
+    #endif
+
+    int result = myAPI->getStationsData(access_token, device_id, DELAYUTC_YOURTIMEZONE); 
+
+    if (result == EXPIRED_ACCESS_TOKEN || result == INVALID_ACCESS_TOKEN) {
+      if (myAPI->getRefreshToken(access_token, refresh_token, client_secret, client_id))
+      {
+        
+        // compare cred with previous
+        if(strncmp(previous_access_token, access_token, 58) != 0){
+          nvs.putString("access_token", access_token);
+          Serial.println("NVS : access_token updated");   
+        } else {
+          Serial.println("NVS : same access_token");
+          
+        }
+
+        if(strncmp(previous_refresh_token, refresh_token, 58) != 0){
+          nvs.putString("refresh_token", refresh_token);
+          Serial.println("NVS : refresh_token updated");
+            
+        } else {
+          Serial.println("NVS : same refresh_token");
+          
+        }
+        result = myAPI->getStationsData(access_token, device_id, DELAYUTC_YOURTIMEZONE);
+        
+      }
+    }
+    return result;
+}
+
+
 void displayLine(String text)
 {
-  drawString(10, currentLinePos, text + "  " + currentLinePos, &FiraSans_12);
+  drawString(10, currentLinePos, text, &FiraSans_12);
   currentLinePos += 35;
 }
 
