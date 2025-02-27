@@ -1,23 +1,62 @@
 // Decomment to DEBUG
-#define DEBUG_NETATMO
+// #define DEBUG_NETATMO
 // #define DEBUG_GRID
-//#define DEBUG_WIFI
+// #define DEBUG_WIFI
 #define DEBUG_SERIAL
 //#define FORCE_NVS
+
+#define T5PLUS
+
+// const definition
+#ifdef T5PLUS
+  #define DEF_PIN_BAT 14
+  #define DEF_INIT_LINE_POS 35
+  #define DEF_BAR_WIDTH 9
+  #define DEF_BAR_HEIGHT 12
+  #define DEF_BAT_LEFT_MARGIN 480
+  #define DEF_BAT_TOP_MARGIN 10
+  #define DEF_MODULE_HEIGHT 160
+  #define DEF_GRID_SPACING 20
+  #define DEF_RECT_LEFT_MARGIN 4
+#else
+  #define DEF_PIN_BAT 35
+  #define DEF_INIT_LINE_POS 0
+  #define DEF_BAR_WIDTH 3
+  #define DEF_BAR_HEIGHT 4
+  #define DEF_BAT_LEFT_MARGIN 90
+  #define DEF_BAT_TOP_MARGIN 5
+  #define DEF_MODULE_HEIGHT 50
+  #define DEF_GRID_SPACING 10
+  #define EPD_HEIGHT 122
+  #define EPD_WIDTH 250
+  #define DEF_RECT_LEFT_MARGIN 2
+#endif
 
 // Customize with your settings
 #include "TOCUSTOMIZE.h"
 
-// epd
-#include "epd_highlevel.h"
-#include "epd_driver.h"
+// screen specific
+#ifdef T5PLUS
+	#include "epd_highlevel.h"
+	#include "epd_driver.h"
+	
+	//font	
+	#include "firasans_12.h"
+	#include "opensans16.h"
+	#include "opensans24.h"
+	#include "opensans24b.h"
+	#include "firasans_40.h"
+#else
+	#include <GxEPD.h>
+	#include <GxDEPG0213BN/GxDEPG0213BN.h>
+	#include <GxIO/GxIO_SPI/GxIO_SPI.h>
+	#include <GxIO/GxIO.h>
 
-// font
-#include "firasans_12.h"
-#include "opensans16.h"
-#include "opensans24.h"
-#include "opensans24b.h"
-#include "firasans_40.h"
+	//font
+	#include <Fonts/FreeSans9pt7b.h>
+	#include <Fonts/FreeSansBold12pt7b.h>
+	#include <Fonts/Org_01.h>
+#endif
 
 #include <WiFi.h>
 #include <MyDumbWifi.h>
@@ -32,28 +71,34 @@ Preferences nvs;
 char previous_access_token[58];
 char previous_refresh_token[58];
 
-EpdiyHighlevelState hl;
-// ambient temperature around device
-int temperature = 20;
-uint8_t *framebuffer;
-enum EpdDrawError err;
+// screen specific again
+#ifdef T5PLUS
+	EpdiyHighlevelState hl;
+	// ambient temperature around device
+	int temperature = 20;
+	uint8_t *framebuffer;
+	enum EpdDrawError err;
 
-#define Black 0x00
-#define Grey 0x80
-#define White 0xF0
+	#define Black 0x00
+	#define Grey 0x80
+	#define White 0xF0
 
-#define WAVEFORM EPD_BUILTIN_WAVEFORM
+	#define WAVEFORM EPD_BUILTIN_WAVEFORM
 
-// CHOOSE HERE YOU IF YOU WANT PORTRAIT OR LANDSCAPE
-// both orientations possible
-EpdRotation orientation = EPD_ROT_PORTRAIT;
-// EpdRotation orientation = EPD_ROT_LANDSCAPE;
+	// CHOOSE HERE YOU IF YOU WANT PORTRAIT OR LANDSCAPE
+	// both orientations possible
+	EpdRotation orientation = EPD_ROT_PORTRAIT;
+	// EpdRotation orientation = EPD_ROT_LANDSCAPE;
+#else
+	GxIO_Class io(SPI, /*CS=5*/ SS, /*DC=*/17, /*RST=*/16);
+	GxEPD_Class display(io, /*RST=*/16, /*BUSY=*/4);
+#endif
 
-const int PIN_BAT = 14;        // adc for bat voltage
+const int PIN_BAT = DEF_PIN_BAT;        // adc for bat voltage
 const float VOLTAGE_100 = 4.2; // Full battery curent li-ion
 const float VOLTAGE_0 = 3.5;   // Low battery curent li-ion
 
-int currentLinePos = 35;
+int currentLinePos = DEF_INIT_LINE_POS;
 
 int batteryPercentage = 0;
 float batteryVoltage = 0.0;
@@ -68,10 +113,15 @@ tm getTimeWithDelta(int delta);
 String getFullDateStringAddDelta(bool withTime, int delta);
 bool initializeTime();
 
+#ifdef T5PLUS
 void drawString(int x, int y, String text, const EpdFont *font);
+#else
+void drawString(int x, int y, String text, GFXfont *font);
+#endif
 void drawLine(int x0, int y0, int y1, int y2);
 void drawRect(int x, int y, int width, int height);
 void clearScreen();
+void finalizeDisplay();
 
 void updateBatteryPercentage(int &percentage, float &voltage);
 void displayLine(String text);
@@ -177,6 +227,7 @@ bool initializeTime()
 
 
 
+#ifdef T5PLUS
 void drawString(int x, int y, String text, const EpdFont *font)
 {
   char *data = const_cast<char *>(text.c_str());
@@ -184,30 +235,65 @@ void drawString(int x, int y, String text, const EpdFont *font)
   epd_write_string(font, data, &x, &y, framebuffer, &font_props);
 }
 
+#else
+void drawString(int x, int y, String text, GFXfont *font)
+{
+  display.setFont(font);
+  display.setCursor(x, y);
+  display.print(text);
+}
+#endif
+
+
 void drawLine(int x0, int y0, int x1, int y1)
 {
+#ifdef T5PLUS
   epd_draw_line(x0, y0, x1, y1, Black, framebuffer);
+#else
+  display.drawLine(x0, y0, x1, y1, GxEPD_BLACK);
+#endif
 }
 
 void clearScreen()
 {
   // Initialize display
+#ifdef T5PLUS    
   epd_init(EPD_OPTIONS_DEFAULT);
   hl = epd_hl_init(WAVEFORM);
   epd_set_rotation(orientation);
   framebuffer = epd_hl_get_framebuffer(&hl);
   epd_poweron();
   epd_clear();
+#else
+	display.init();
+	display.fillScreen(GxEPD_WHITE);
+	display.setTextColor(GxEPD_BLACK);
+#endif
+}
+
+void finalizeDisplay()
+{
+#ifdef T5PLUS
+  err = epd_hl_update_screen(&hl, MODE_GC16, temperature);
+  Serial.print("Update Result : ");
+  Serial.println(err);
+#else
+	display.update();
+#endif
 }
 
 void drawRect(int x, int y, int width, int height)
 {
+#ifdef T5PLUS
   EpdRect rect = {
       .x = x,
       .y = y,
       .width = width,
       .height = height};
   epd_draw_rect(rect, Black, framebuffer);
+#else
+	display.drawRoundRect(x, y, width, height, 8, GxEPD_BLACK);
+#endif
 }
 
 void setup()
@@ -242,7 +328,6 @@ void setup()
 #ifdef DEBUG_WIFI
   mdw.setDebug(true);
 #endif
-
   if (!mdw.connectToWiFi(wifi_ssid, wifi_key))
   {
     clearScreen();
@@ -254,8 +339,7 @@ void setup()
 	  
     nvs.begin("netatmoCred", false);
     NetatmoWeatherAPI myAPI;
-    
-
+	
 #ifdef FORCE_NVS
     nvs.putString("access_token", access_token);
     nvs.putString("refresh_token", refresh_token);
@@ -307,16 +391,13 @@ void setup()
             displayLine("Ok ? WTF ?");
           break;
         }
+        displayLine("HttpCodes " + myAPI.allHttpCodes);
         displayLine("Msg " + myAPI.errorMessage);
         displayLine("LastBody " + myAPI.lastBody);
     }    
   }
 
-
-  err = epd_hl_update_screen(&hl, MODE_GC16, temperature);
-  Serial.print("Update Result : ");
-  Serial.println(err);
-
+  finalizeDisplay();
   goToDeepSleepUntilNextWakeup();
 }
 
@@ -376,20 +457,30 @@ int getDataFromAPI(NetatmoWeatherAPI *myAPI) {
     return result;
 }
 
-
 void displayLine(String text)
 {
-  drawString(10, currentLinePos, text, &FiraSans_12);
+#ifdef T5PLUS
+	drawString(10, currentLinePos, text, &FiraSans_12);
   currentLinePos += 35;
+#else
+if (currentLinePos > 150)
+  {
+    currentLinePos = 0;
+    clearScreen();
+  }
+  display.setCursor(10, currentLinePos);
+  display.print(text);
+  currentLinePos += 10;
+#endif  
 }
 
 void drawBatteryLevel(int batteryTopLeftX, int batteryTopLeftY, int percentage)
 {
   // Draw battery Level
   const int nbBars = 4;
-  const int barWidth = 9;
+  const int barWidth = DEF_BAR_WIDTH;
   const int batteryWidth = (barWidth + 1) * nbBars + 2;
-  const int barHeight = 12;
+  const int barHeight = DEF_BAR_HEIGHT;
   const int batteryHeight = barHeight + 4;
 
   // Horizontal
@@ -428,7 +519,7 @@ void displayModulePluvio(module_struct module, int y)
   const int mmSum24HOffsetX = 240;
   const int mmSum24HOffsetY = 100;
 
-  drawRect(4, y, rectWidth, rectHeight);
+  drawRect(DEF_RECT_LEFT_MARGIN, y, rectWidth, rectHeight);
   drawString(nameOffsetX, y + nameOffsetY, module.name, &OpenSans24);
 
   drawString(mmSum24HOffsetX, y + mmSum24HOffsetY, module.sum_rain_24h + "mm", &FiraSans_40);
@@ -448,22 +539,23 @@ void displayModule(module_struct module, int y)
   const int tempOffsetX = 320;
   const int tempOffsetY = 90;
 
+  const int maxTempOffsetX = 15;
+  const int maxTempOffsetY = 100;
+
   const int humidityOffsetX = 400;
   const int humidityOffsetY = 140;
 
   const int minTempOffsetX = 15;
   const int minTempOffsetY = 140;
 
-  const int maxTempOffsetX = 15;
-  const int maxTempOffsetY = 100;
-
+  
   const int trendTempOffsetX = 270;
   const int trendTempOffsetY = 90;
 
   const int reachableOffsetX = 420;
   const int reachableOffsetY = 40;
 
-  drawRect(4, y, rectWidth, rectHeight);
+  drawRect(DEF_RECT_LEFT_MARGIN, y, rectWidth, rectHeight);
   drawString(nameOffsetX, y + nameOffsetY, module.name, &OpenSans24);
 
   drawString(tempOffsetX, y + tempOffsetY, module.temperature + "°", &FiraSans_40);
@@ -494,12 +586,13 @@ void displayModule(module_struct module, int y)
 }
 
 void displayInfo(NetatmoWeatherAPI myAPI)
-{
+{ 
+  // T5PLUS :
   // 6 modules sur 960 de haut = 160 par module
   // 5 marge à gauche 5 marge à droite => reste 530
-  const int battery_left_margin = 480;
-  const int battery_top_margin = 10;
-  const int module_height = 160;
+  const int battery_left_margin = DEF_BAT_LEFT_MARGIN;
+  const int battery_top_margin = DEF_BAT_TOP_MARGIN;
+  const int module_height = DEF_MODULE_HEIGHT;
 
   int y = 0;
   displayModule(myAPI.NAMain, y);
@@ -523,21 +616,20 @@ void displayInfo(NetatmoWeatherAPI myAPI)
   drawBatteryLevel(battery_left_margin, y + battery_top_margin, myAPI.NAModule4[2].battery_percent);
   y += module_height;
 
+#ifdef T5PLUS
   displayModulePluvio(myAPI.NAModule3, y);
   drawBatteryLevel(battery_left_margin, y + battery_top_margin, myAPI.NAModule3.battery_percent);
 
   String dateRefresh = getFullDateStringAddDelta(true,0);
   drawString(15, y + 140, "↻ " + dateRefresh, &OpenSans16);
-
+#endif
 }
-
-
 
 void drawDebugGrid()
 {
-  int gridSpacing = 20;         // Espacement entre les lignes de la grille
-  int screenWidth = EPD_HEIGHT; // 540
-  int screenHeight = EPD_WIDTH; // 960
+  int gridSpacing = DEF_GRID_SPACING; // Espacement entre les lignes de la grille
+  int screenWidth = EPD_HEIGHT; // T5PLUS 540 // 122
+  int screenHeight = EPD_WIDTH; // T5PLUS 960 // 250
 
   Serial.print("Width : ");
   Serial.print(screenWidth);
@@ -559,16 +651,20 @@ void drawDebugGrid()
 
 void goToDeepSleepUntilNextWakeup()
 {
+#ifdef T5PLUS
   // pause time to permit upload
-  delay(60000);
+  delay(20000);
+#endif
 
   time_t sleepDuration = WAKEUP_INTERVAL;
   Serial.print("Sleeping duration (seconds): ");
   Serial.println(sleepDuration);
 
   // Configure wake up
+#ifdef T5PLUS  
   epd_poweroff();
   delay(400);
+#endif
 
   esp_sleep_enable_timer_wakeup(sleepDuration * 1000000ULL);
   esp_deep_sleep_start();
@@ -578,3 +674,4 @@ void loop()
 {
   // put your main code here, to run repeatedly:
 }
+
